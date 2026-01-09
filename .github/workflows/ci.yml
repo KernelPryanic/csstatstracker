@@ -29,6 +29,7 @@ jobs:
             libx11-xcb-dev \
             libxcb1-dev \
             libxkbcommon-dev \
+            libxkbcommon-x11-dev \
             libxcursor-dev \
             libxrandr-dev \
             libxinerama-dev \
@@ -60,6 +61,7 @@ jobs:
             libx11-xcb-dev \
             libxcb1-dev \
             libxkbcommon-dev \
+            libxkbcommon-x11-dev \
             libxcursor-dev \
             libxrandr-dev \
             libxinerama-dev \
@@ -87,6 +89,7 @@ jobs:
             libx11-xcb-dev \
             libxcb1-dev \
             libxkbcommon-dev \
+            libxkbcommon-x11-dev \
             libxcursor-dev \
             libxrandr-dev \
             libxinerama-dev \
@@ -114,6 +117,7 @@ jobs:
             libx11-xcb-dev \
             libxcb1-dev \
             libxkbcommon-dev \
+            libxkbcommon-x11-dev \
             libxcursor-dev \
             libxrandr-dev \
             libxinerama-dev \
