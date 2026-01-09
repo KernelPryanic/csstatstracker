@@ -30,3 +30,22 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+__debug_*
+
+# Binary
+csstatstracker
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# Config
+csstatstracker.json
+
+# Fyne cross-compilation output
+fyne-cross/
+
+# GoReleaser output
+dist/
