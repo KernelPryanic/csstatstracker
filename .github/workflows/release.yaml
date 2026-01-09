@@ -33,8 +33,8 @@ jobs:
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
           mkdir -p dist
-          cd fyne-cross/dist/windows-amd64
-          zip ../../../dist/csstatstracker_${VERSION}_windows_amd64.zip "CS Stats Tracker.exe"
+          # fyne-cross creates a zip directly, rename it
+          mv "fyne-cross/dist/windows-amd64/CS Stats Tracker.exe.zip" "dist/csstatstracker_${VERSION}_windows_amd64.zip"
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
