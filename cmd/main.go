@@ -11,6 +11,7 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 
@@ -206,6 +207,34 @@ func main() {
 
 	w.SetContent(tabs)
 	w.Resize(fyne.Size{Width: 600, Height: 450})
+
+	// Setup system tray
+	if desk, ok := a.(desktop.App); ok {
+		// Create tray icon from embedded resource
+		trayIcon := fyne.NewStaticResource("icon.png", csstatstracker.IconData)
+		desk.SetSystemTrayIcon(trayIcon)
+
+		// Create tray menu
+		trayMenu := fyne.NewMenu("CS Stats Tracker",
+			fyne.NewMenuItem("Show", func() {
+				w.Show()
+			}),
+			fyne.NewMenuItemSeparator(),
+			fyne.NewMenuItem("Quit", func() {
+				a.Quit()
+			}),
+		)
+		desk.SetSystemTrayMenu(trayMenu)
+	}
+
+	// Intercept window close to minimize to tray if enabled
+	w.SetCloseIntercept(func() {
+		if cfg.MinimizeToTray {
+			w.Hide()
+		} else {
+			a.Quit()
+		}
+	})
 
 	// Start hotkey handling
 	t.StartHotkeys()

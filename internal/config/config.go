@@ -21,18 +21,20 @@ type Hotkeys struct {
 
 // Config holds the application configuration
 type Config struct {
-	GameScore    int     `json:"game_score"`
-	SoundEnabled bool    `json:"sound_enabled"`
-	Hotkeys      Hotkeys `json:"hotkeys"`
+	GameScore      int     `json:"game_score"`
+	SoundEnabled   bool    `json:"sound_enabled"`
+	MinimizeToTray bool    `json:"minimize_to_tray"`
+	Hotkeys        Hotkeys `json:"hotkeys"`
 }
 
 // Default returns the default configuration
 // Hotkey defaults are platform-specific (see defaults_linux.go, defaults_windows.go)
 func Default() *Config {
 	return &Config{
-		GameScore:    8,
-		SoundEnabled: true,
-		Hotkeys:      defaultHotkeys(),
+		GameScore:      8,
+		SoundEnabled:   true,
+		MinimizeToTray: false,
+		Hotkeys:        defaultHotkeys(),
 	}
 }
 

@@ -45,6 +45,13 @@ func (s *SettingsTab) buildUI() fyne.CanvasObject {
 	})
 	soundCheck.Checked = s.cfg.SoundEnabled
 
+	// Minimize to tray toggle
+	trayCheck := widget.NewCheck("Close to System Tray", func(enabled bool) {
+		s.cfg.MinimizeToTray = enabled
+		s.save()
+	})
+	trayCheck.Checked = s.cfg.MinimizeToTray
+
 	// Create buttons for each hotkey
 	var incCTButton, decCTButton, incTButton, decTButton, resetHotkeyButton, selectCTButton, selectTButton *widget.Button
 
@@ -78,6 +85,8 @@ func (s *SettingsTab) buildUI() fyne.CanvasObject {
 
 	form := container.NewVBox(
 		soundCheck,
+		trayCheck,
+		widget.NewSeparator(),
 		widget.NewLabel("Hotkey Configuration (click to change)"),
 		widget.NewForm(
 			widget.NewFormItem("Increment CT", incCTButton),
