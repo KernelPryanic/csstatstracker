@@ -1,6 +1,6 @@
 [Details]
-Icon = ""
+Icon = "Icon.png"
 Name = "CS Stats Tracker"
 ID = "com.csstatstracker.app"
-Version = "1.0.0"
+Version = "0.1.0"
 Build = 1
