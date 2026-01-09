@@ -19,8 +19,8 @@ import (
 )
 
 var (
-	selectedColor   = color.RGBA{R: 70, G: 130, B: 180, A: 255}  // Steel blue
-	unselectedColor = color.RGBA{R: 0, G: 0, B: 0, A: 0}         // Transparent
+	selectedColor   = color.RGBA{R: 70, G: 130, B: 180, A: 255} // Steel blue
+	unselectedColor = color.RGBA{R: 0, G: 0, B: 0, A: 0}        // Transparent
 )
 
 // selectableRow is a tappable row that supports selection with highlighting
@@ -156,7 +156,7 @@ func (h *HistoryTab) Container() fyne.CanvasObject {
 			}
 			game := h.games[id]
 			gameID := game.ID
-			rowIdx := int(id)
+			rowIdx := id
 
 			row := obj.(*selectableRow)
 			row.rowIdx = rowIdx

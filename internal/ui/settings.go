@@ -15,9 +15,9 @@ import (
 
 // SettingsTab manages the settings view
 type SettingsTab struct {
-	cfg      *config.Config
-	window   fyne.Window
-	onSave   func(*config.Config)
+	cfg       *config.Config
+	window    fyne.Window
+	onSave    func(*config.Config)
 	container fyne.CanvasObject
 }
 

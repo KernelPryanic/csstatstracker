@@ -64,7 +64,7 @@ func (s *StatsTab) Container() fyne.CanvasObject {
 	s.chartLabel = widget.NewLabel("Net Wins/Losses by Day:")
 
 	// Chart container
-	s.chartContainer = container.NewMax()
+	s.chartContainer = container.NewStack()
 
 	// Time window selector
 	windowSelect := widget.NewSelect(

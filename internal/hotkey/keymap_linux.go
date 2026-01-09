@@ -165,7 +165,7 @@ func mapKeyToName(ev hook.Event) string {
 
 	// For printable characters, use the keychar directly
 	if ev.Keychar >= 32 && ev.Keychar <= 126 {
-		return string(rune(ev.Keychar))
+		return string(ev.Keychar)
 	}
 
 	// Return empty if we can't map it

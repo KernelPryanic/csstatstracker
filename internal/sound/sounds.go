@@ -84,7 +84,7 @@ func (p *Player) playFile(path string) {
 	if err != nil {
 		return
 	}
-	defer streamer.Close()
+	defer func() { _ = streamer.Close() }()
 
 	if err := p.initSpeaker(format.SampleRate); err != nil {
 		return

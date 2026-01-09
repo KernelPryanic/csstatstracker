@@ -34,7 +34,7 @@ func main() {
 	if err != nil {
 		panic(fmt.Errorf("failed to initialize database: %w", err))
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	a := app.New()
 	w := a.NewWindow("CS Stats Tracker")
@@ -196,9 +196,10 @@ func main() {
 
 	// Auto-refresh tabs when switching to them
 	tabs.OnSelected = func(tab *container.TabItem) {
-		if tab == historyTabItem {
+		switch tab {
+		case historyTabItem:
 			historyTab.Refresh()
-		} else if tab == statsTabItem {
+		case statsTabItem:
 			statsTab.Refresh()
 		}
 	}

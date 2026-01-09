@@ -1,3 +1,10 @@
+<p align="center">
+  <img src="Icon.png" alt="CS Stats Tracker" width="128">
+</p>
+
+[![GitHub go.mod Go version of a Go module](https://img.shields.io/github/go-mod/go-version/gomods/athens.svg)](https://github.com/KernelPryanic/goudpscan)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 # CS Stats Tracker
 
 A Counter-Strike statistics tracker built with Go and Fyne for manually tracking CT vs T round wins.

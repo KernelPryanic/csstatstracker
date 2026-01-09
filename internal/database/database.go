@@ -44,25 +44,25 @@ func Init(ctx context.Context, dbPath string, migrationsFS embed.FS) (*sql.DB, e
 	// Create migration source from embedded FS
 	source, err := iofs.New(migrationsFS, "migrations")
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("failed to create migration source: %w", err)
 	}
 
 	// Run migrations
 	driver, err := sqlite.WithInstance(db, &sqlite.Config{})
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("failed to create migration driver: %w", err)
 	}
 
 	m, err := migrate.NewWithInstance("iofs", source, "sqlite", driver)
 	if err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("failed to create migration instance: %w", err)
 	}
 
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 
@@ -86,7 +86,7 @@ func GetAllGames(ctx context.Context, db *sql.DB) ([]GameStats, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to query games: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var games []GameStats
 	for rows.Next() {
@@ -151,19 +151,19 @@ func GetWindowStart(window TimeWindow) time.Time {
 
 // Stats holds aggregated statistics
 type Stats struct {
-	TotalGames   int
-	Wins         int
-	Losses       int
-	Draws        int
-	WinRate      float64
-	CTWins       int
-	CTLosses     int
-	CTGames      int
-	CTWinRate    float64
-	TWins        int
-	TLosses      int
-	TGames       int
-	TWinRate     float64
+	TotalGames int
+	Wins       int
+	Losses     int
+	Draws      int
+	WinRate    float64
+	CTWins     int
+	CTLosses   int
+	CTGames    int
+	CTWinRate  float64
+	TWins      int
+	TLosses    int
+	TGames     int
+	TWinRate   float64
 }
 
 // DailyStats holds win/loss counts for a specific date
@@ -193,7 +193,7 @@ func GetStats(ctx context.Context, db *sql.DB, window TimeWindow) (*Stats, error
 	if err != nil {
 		return nil, fmt.Errorf("failed to query stats: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	stats := &Stats{}
 
@@ -210,7 +210,8 @@ func GetStats(ctx context.Context, db *sql.DB, window TimeWindow) (*Stats, error
 		playerTeam := Team(team)
 		var playerWon, playerLost bool
 
-		if playerTeam == TeamCT {
+		switch playerTeam {
+		case TeamCT:
 			stats.CTGames++
 			if ctScore > tScore {
 				playerWon = true
@@ -219,7 +220,7 @@ func GetStats(ctx context.Context, db *sql.DB, window TimeWindow) (*Stats, error
 				playerLost = true
 				stats.CTLosses++
 			}
-		} else if playerTeam == TeamT {
+		case TeamT:
 			stats.TGames++
 			if tScore > ctScore {
 				playerWon = true
@@ -228,7 +229,7 @@ func GetStats(ctx context.Context, db *sql.DB, window TimeWindow) (*Stats, error
 				playerLost = true
 				stats.TLosses++
 			}
-		} else {
+		default:
 			// No team selected - can't determine win/loss
 			stats.Draws++
 			continue
@@ -285,7 +286,7 @@ func GetDailyStats(ctx context.Context, db *sql.DB, window TimeWindow) ([]DailyS
 	if err != nil {
 		return nil, fmt.Errorf("failed to query daily stats: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	// Map to accumulate stats by date
 	dailyMap := make(map[string]*DailyStats)
@@ -306,7 +307,8 @@ func GetDailyStats(ctx context.Context, db *sql.DB, window TimeWindow) ([]DailyS
 		ds := dailyMap[dayStr]
 		playerTeam := Team(team)
 
-		if playerTeam == TeamCT {
+		switch playerTeam {
+		case TeamCT:
 			if ctScore > tScore {
 				ds.Wins++
 			} else if tScore > ctScore {
@@ -314,7 +316,7 @@ func GetDailyStats(ctx context.Context, db *sql.DB, window TimeWindow) ([]DailyS
 			} else {
 				ds.Draws++
 			}
-		} else if playerTeam == TeamT {
+		case TeamT:
 			if tScore > ctScore {
 				ds.Wins++
 			} else if ctScore > tScore {
@@ -322,7 +324,7 @@ func GetDailyStats(ctx context.Context, db *sql.DB, window TimeWindow) ([]DailyS
 			} else {
 				ds.Draws++
 			}
-		} else {
+		default:
 			ds.Draws++
 		}
 	}
