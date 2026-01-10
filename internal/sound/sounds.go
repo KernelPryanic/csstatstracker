@@ -136,3 +136,13 @@ func (p *Player) PlayCTSelect() {
 func (p *Player) PlayTSelect() {
 	go p.playFile("sound/t_select.wav")
 }
+
+// PlayWin plays the win melody
+func (p *Player) PlayWin() {
+	go p.playFile("sound/win.wav")
+}
+
+// PlayLose plays the lose melody
+func (p *Player) PlayLose() {
+	go p.playFile("sound/lose.wav")
+}

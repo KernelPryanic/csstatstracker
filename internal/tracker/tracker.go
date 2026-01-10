@@ -264,8 +264,28 @@ func (t *Tracker) HandleDone() {
 		return
 	}
 
-	t.sound.PlayMatchEnd()
+	t.playMatchEndSound()
 	t.resetScores()
+}
+
+// playMatchEndSound plays win, lose, or generic match end sound based on team
+func (t *Tracker) playMatchEndSound() {
+	switch t.team {
+	case database.TeamCT:
+		if t.ctWins > t.tWins {
+			t.sound.PlayWin()
+		} else {
+			t.sound.PlayLose()
+		}
+	case database.TeamT:
+		if t.tWins > t.ctWins {
+			t.sound.PlayWin()
+		} else {
+			t.sound.PlayLose()
+		}
+	default:
+		t.sound.PlayMatchEnd()
+	}
 }
 
 // resetScores clears scores without playing sound (used by HandleDone)
