@@ -44,7 +44,7 @@ func New(db *sql.DB, w fyne.Window, cfg *config.Config, ctLabel, tLabel *canvas.
 		db:      db,
 		window:  w,
 		Config:  cfg,
-		sound:   sound.New(soundFS, cfg.SoundEnabled),
+		sound:   sound.New(soundFS, cfg.SoundEnabled, cfg.SoundVolume),
 	}
 
 	// Create entry with auto-save on change

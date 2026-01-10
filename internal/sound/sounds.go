@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"embed"
 	"io"
+	"math"
 	"sync"
 	"time"
 
 	"github.com/gopxl/beep/v2"
+	"github.com/gopxl/beep/v2/effects"
 	"github.com/gopxl/beep/v2/mp3"
 	"github.com/gopxl/beep/v2/speaker"
 	"github.com/gopxl/beep/v2/wav"
@@ -16,15 +18,17 @@ import (
 // Player handles sound playback
 type Player struct {
 	enabled     bool
+	volume      float64 // 0.0 to 1.0
 	initialized bool
 	mu          sync.Mutex
 	soundsFS    embed.FS
 }
 
 // New creates a new sound player
-func New(soundsFS embed.FS, enabled bool) *Player {
+func New(soundsFS embed.FS, enabled bool, volume float64) *Player {
 	return &Player{
 		enabled:  enabled,
+		volume:   volume,
 		soundsFS: soundsFS,
 	}
 }
@@ -41,6 +45,20 @@ func (p *Player) IsEnabled() bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.enabled
+}
+
+// SetVolume sets the playback volume (0.0 to 1.0)
+func (p *Player) SetVolume(volume float64) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.volume = volume
+}
+
+// GetVolume returns the current volume level
+func (p *Player) GetVolume() float64 {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.volume
 }
 
 // initSpeaker initializes the speaker if not already done
@@ -63,6 +81,7 @@ func (p *Player) playFile(path string) {
 		p.mu.Unlock()
 		return
 	}
+	volume := p.volume
 	p.mu.Unlock()
 
 	data, err := p.soundsFS.ReadFile(path)
@@ -90,8 +109,24 @@ func (p *Player) playFile(path string) {
 		return
 	}
 
+	// Apply volume adjustment (convert 0-1 range to decibels)
+	// Volume 1.0 = 0dB, Volume 0.5 = -6dB, Volume 0.0 = silence
+	var finalStreamer beep.Streamer = streamer
+	if volume < 1.0 {
+		if volume <= 0 {
+			return // Silent, don't play
+		}
+		// Convert linear volume to decibels: dB = 20 * log10(volume)
+		db := 20 * math.Log10(volume)
+		finalStreamer = &effects.Volume{
+			Streamer: streamer,
+			Base:     2,
+			Volume:   db / 10, // effects.Volume uses Base^Volume, so we adjust
+		}
+	}
+
 	done := make(chan bool)
-	speaker.Play(beep.Seq(streamer, beep.Callback(func() {
+	speaker.Play(beep.Seq(finalStreamer, beep.Callback(func() {
 		done <- true
 	})))
 	<-done

@@ -183,6 +183,7 @@ func main() {
 		}
 		t.UpdateHotkeys()
 		t.Sound().SetEnabled(cfg.SoundEnabled)
+		t.Sound().SetVolume(cfg.SoundVolume)
 	})
 
 	// Create tabs

@@ -23,6 +23,7 @@ type Hotkeys struct {
 type Config struct {
 	GameScore      int     `json:"game_score"`
 	SoundEnabled   bool    `json:"sound_enabled"`
+	SoundVolume    float64 `json:"sound_volume"`
 	MinimizeToTray bool    `json:"minimize_to_tray"`
 	Hotkeys        Hotkeys `json:"hotkeys"`
 }
@@ -33,6 +34,7 @@ func Default() *Config {
 	return &Config{
 		GameScore:      8,
 		SoundEnabled:   true,
+		SoundVolume:    1.0,
 		MinimizeToTray: false,
 		Hotkeys:        defaultHotkeys(),
 	}
@@ -57,6 +59,11 @@ func Load(path string) (*Config, error) {
 	if len(cfg.Hotkeys.IncrementCT) == 0 {
 		def := Default()
 		cfg.Hotkeys = def.Hotkeys
+	}
+
+	// Ensure sound volume is set if missing (0 means not set in config)
+	if cfg.SoundVolume == 0 {
+		cfg.SoundVolume = 1.0
 	}
 
 	return &cfg, nil

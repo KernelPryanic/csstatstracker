@@ -6,6 +6,7 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
@@ -44,6 +45,20 @@ func (s *SettingsTab) buildUI() fyne.CanvasObject {
 		s.save()
 	})
 	soundCheck.Checked = s.cfg.SoundEnabled
+
+	// Volume slider
+	volumeBinding := binding.NewFloat()
+	_ = volumeBinding.Set(s.cfg.SoundVolume)
+	volumeLabel := widget.NewLabel(fmt.Sprintf("Volume: %d%%", int(s.cfg.SoundVolume*100)))
+	volumeSlider := widget.NewSliderWithData(0, 1, volumeBinding)
+	volumeSlider.Step = 0.05
+	volumeBinding.AddListener(binding.NewDataListener(func() {
+		val, _ := volumeBinding.Get()
+		s.cfg.SoundVolume = val
+		volumeLabel.SetText(fmt.Sprintf("Volume: %d%%", int(val*100)))
+		s.save()
+	}))
+	volumeRow := container.NewBorder(nil, nil, volumeLabel, nil, volumeSlider)
 
 	// Minimize to tray toggle
 	trayCheck := widget.NewCheck("Close to System Tray", func(enabled bool) {
@@ -85,6 +100,7 @@ func (s *SettingsTab) buildUI() fyne.CanvasObject {
 
 	form := container.NewVBox(
 		soundCheck,
+		volumeRow,
 		trayCheck,
 		widget.NewSeparator(),
 		widget.NewLabel("Hotkey Configuration (click to change)"),
