@@ -32,15 +32,23 @@ type StatsTab struct {
 	aggregation   AggregationInterval
 	container     *fyne.Container
 
-	// Stat displays
+	// Sub-tabs
+	subTabs *container.AppTabs
+
+	// Win Rate sub-tab
 	winRateLabel   *widget.Label
 	ctWinRateLabel *widget.Label
 	tWinRateLabel  *widget.Label
 	gamesLabel     *widget.Label
 	chartLabel     *widget.Label
-
-	// Chart container
 	chartContainer *fyne.Container
+
+	// Play Time sub-tab
+	totalTimeLabel  *widget.Label
+	ctTimeLabel     *widget.Label
+	tTimeLabel      *widget.Label
+	timeChartLabel  *widget.Label
+	timeChartContainer *fyne.Container
 }
 
 // NewStatsTab creates a new statistics tab
@@ -56,15 +64,20 @@ func NewStatsTab(db *sql.DB, window fyne.Window) *StatsTab {
 
 // Container returns the tab content
 func (s *StatsTab) Container() fyne.CanvasObject {
-	// Stats labels (create first to avoid nil pointer in refresh)
+	// Initialize labels for Win Rate sub-tab
 	s.winRateLabel = widget.NewLabel("Win Rate: --")
 	s.ctWinRateLabel = widget.NewLabel("CT Win Rate: --")
 	s.tWinRateLabel = widget.NewLabel("T Win Rate: --")
 	s.gamesLabel = widget.NewLabel("Games: 0")
 	s.chartLabel = widget.NewLabel("Net Wins/Losses by Day:")
-
-	// Chart container
 	s.chartContainer = container.NewStack()
+
+	// Initialize labels for Play Time sub-tab
+	s.totalTimeLabel = widget.NewLabel("Total Play Time: --")
+	s.ctTimeLabel = widget.NewLabel("CT Play Time: --")
+	s.tTimeLabel = widget.NewLabel("T Play Time: --")
+	s.timeChartLabel = widget.NewLabel("Play Time by Day:")
+	s.timeChartContainer = container.NewStack()
 
 	// Time window selector
 	windowSelect := widget.NewSelect(
@@ -101,51 +114,84 @@ func (s *StatsTab) Container() fyne.CanvasObject {
 			default:
 				s.aggregation = AggregateByDay
 			}
-			s.updateChartLabel()
+			s.updateChartLabels()
 			s.refresh()
 		},
 	)
 	aggregationSelect.SetSelected("By Day")
 
-	// Stats panel
-	statsPanel := container.NewVBox(
-		container.NewHBox(
-			widget.NewLabel("Period:"),
-			windowSelect,
-			widget.NewLabel("Group:"),
-			aggregationSelect,
-		),
-		widget.NewSeparator(),
-		s.gamesLabel,
-		s.winRateLabel,
-		widget.NewSeparator(),
-		widget.NewLabel("Win Rate by Team:"),
-		s.ctWinRateLabel,
-		s.tWinRateLabel,
-		widget.NewSeparator(),
-		s.chartLabel,
+	// Shared controls (Period and Group)
+	controlsPanel := container.NewHBox(
+		widget.NewLabel("Period:"),
+		windowSelect,
+		widget.NewLabel("Group:"),
+		aggregationSelect,
 	)
 
-	s.container = container.NewBorder(
-		statsPanel,
+	// Win Rate sub-tab content
+	winRateContent := container.NewBorder(
+		container.NewVBox(
+			widget.NewSeparator(),
+			s.gamesLabel,
+			s.winRateLabel,
+			widget.NewSeparator(),
+			widget.NewLabel("Win Rate by Team:"),
+			s.ctWinRateLabel,
+			s.tWinRateLabel,
+			widget.NewSeparator(),
+			s.chartLabel,
+		),
 		nil, nil, nil,
 		s.chartContainer,
+	)
+
+	// Play Time sub-tab content
+	playTimeContent := container.NewBorder(
+		container.NewVBox(
+			widget.NewSeparator(),
+			s.totalTimeLabel,
+			widget.NewSeparator(),
+			widget.NewLabel("Play Time by Team:"),
+			s.ctTimeLabel,
+			s.tTimeLabel,
+			widget.NewSeparator(),
+			s.timeChartLabel,
+		),
+		nil, nil, nil,
+		s.timeChartContainer,
+	)
+
+	// Create sub-tabs
+	s.subTabs = container.NewAppTabs(
+		container.NewTabItem("Win Rate", winRateContent),
+		container.NewTabItem("Play Time", playTimeContent),
+	)
+
+	// Main container with controls at top and sub-tabs below
+	s.container = container.NewBorder(
+		controlsPanel,
+		nil, nil, nil,
+		s.subTabs,
 	)
 
 	s.refresh()
 	return s.container
 }
 
-func (s *StatsTab) updateChartLabel() {
+func (s *StatsTab) updateChartLabels() {
 	switch s.aggregation {
 	case AggregateByWeek:
 		s.chartLabel.SetText("Net Wins/Losses by Week:")
+		s.timeChartLabel.SetText("Play Time by Week:")
 	case AggregateByMonth:
 		s.chartLabel.SetText("Net Wins/Losses by Month:")
+		s.timeChartLabel.SetText("Play Time by Month:")
 	case AggregateByYear:
 		s.chartLabel.SetText("Net Wins/Losses by Year:")
+		s.timeChartLabel.SetText("Play Time by Year:")
 	default:
 		s.chartLabel.SetText("Net Wins/Losses by Day:")
+		s.timeChartLabel.SetText("Play Time by Day:")
 	}
 }
 
@@ -161,16 +207,28 @@ func (s *StatsTab) refresh() {
 	stats, err := database.GetStats(ctx, s.db, s.currentWindow)
 	if err != nil {
 		s.winRateLabel.SetText("Error loading stats")
+		s.totalTimeLabel.SetText("Error loading stats")
 		return
 	}
 
-	// Update labels
+	// Update Win Rate labels
 	s.gamesLabel.SetText(fmt.Sprintf("Games: %d (W:%d L:%d D:%d)", stats.TotalGames, stats.Wins, stats.Losses, stats.Draws))
 	s.winRateLabel.SetText(fmt.Sprintf("Win Rate: %.1f%%", stats.WinRate))
 	s.ctWinRateLabel.SetText(fmt.Sprintf("CT: %.1f%% (%d/%d games)", stats.CTWinRate, stats.CTWins, stats.CTGames))
 	s.tWinRateLabel.SetText(fmt.Sprintf("T: %.1f%% (%d/%d games)", stats.TWinRate, stats.TWins, stats.TGames))
 
-	// Get daily stats for chart
+	// Calculate Play Time (33 minutes per game)
+	const minutesPerGame = 33
+	totalMinutes := stats.TotalGames * minutesPerGame
+	ctMinutes := stats.CTGames * minutesPerGame
+	tMinutes := stats.TGames * minutesPerGame
+
+	// Update Play Time labels
+	s.totalTimeLabel.SetText(fmt.Sprintf("Total Play Time: %s (%d games)", formatPlayTime(totalMinutes), stats.TotalGames))
+	s.ctTimeLabel.SetText(fmt.Sprintf("CT: %s (%d games)", formatPlayTime(ctMinutes), stats.CTGames))
+	s.tTimeLabel.SetText(fmt.Sprintf("T: %s (%d games)", formatPlayTime(tMinutes), stats.TGames))
+
+	// Get daily stats for charts
 	dailyStats, err := database.GetDailyStats(ctx, s.db, s.currentWindow)
 	if err != nil {
 		return
@@ -179,10 +237,40 @@ func (s *StatsTab) refresh() {
 	// Aggregate stats based on selected interval
 	aggregatedStats := s.aggregateStats(dailyStats)
 
-	// Build chart
+	// Build Win Rate chart
 	chart := s.buildChart(aggregatedStats)
 	s.chartContainer.Objects = []fyne.CanvasObject{chart}
 	s.chartContainer.Refresh()
+
+	// Build Play Time chart
+	timeChart := s.buildTimeChart(aggregatedStats)
+	s.timeChartContainer.Objects = []fyne.CanvasObject{timeChart}
+	s.timeChartContainer.Refresh()
+}
+
+// formatPlayTime converts minutes to a readable format (hours and minutes, or days/hours for large values)
+func formatPlayTime(minutes int) string {
+	if minutes < 60 {
+		return fmt.Sprintf("%dm", minutes)
+	}
+
+	hours := minutes / 60
+	mins := minutes % 60
+
+	if hours < 24 {
+		if mins > 0 {
+			return fmt.Sprintf("%dh %dm", hours, mins)
+		}
+		return fmt.Sprintf("%dh", hours)
+	}
+
+	days := hours / 24
+	remainingHours := hours % 24
+
+	if remainingHours > 0 {
+		return fmt.Sprintf("%dd %dh", days, remainingHours)
+	}
+	return fmt.Sprintf("%dd", days)
 }
 
 // AggregatedStats holds aggregated win/loss data for a period
@@ -345,6 +433,52 @@ func (s *StatsTab) buildChart(stats []AggregatedStats) fyne.CanvasObject {
 	return container.NewBorder(nil, legend, nil, nil, scrollable)
 }
 
+func (s *StatsTab) buildTimeChart(stats []AggregatedStats) fyne.CanvasObject {
+	if len(stats) == 0 {
+		noDataLabel := widget.NewLabel("No data for selected period")
+		noDataLabel.Alignment = fyne.TextAlignCenter
+		return container.NewCenter(noDataLabel)
+	}
+
+	const minutesPerGame = 33
+
+	// Calculate time values in minutes and find max value for scaling
+	timeValues := make([]int, len(stats))
+	maxTime := 1
+	for i, st := range stats {
+		totalGames := st.Wins + st.Losses
+		timeValues[i] = totalGames * minutesPerGame
+		if timeValues[i] > maxTime {
+			maxTime = timeValues[i]
+		}
+	}
+
+	// Color for time bars
+	timeColor := color.RGBA{R: 33, G: 150, B: 243, A: 255} // Blue
+
+	// Legend
+	legendBox := canvas.NewRectangle(timeColor)
+	legendBox.SetMinSize(fyne.NewSize(12, 12))
+
+	legend := container.NewHBox(
+		container.NewPadded(legendBox),
+		widget.NewLabel("Play Time"),
+	)
+
+	// Create a custom scalable time chart widget
+	chart := &scalableTimeChart{
+		stats:      stats,
+		timeValues: timeValues,
+		maxTime:    maxTime,
+		timeColor:  timeColor,
+	}
+	chart.ExtendBaseWidget(chart)
+
+	scrollable := container.NewHScroll(chart)
+
+	return container.NewBorder(nil, legend, nil, nil, scrollable)
+}
+
 // scalableChart is a custom widget that scales with available space
 type scalableChart struct {
 	widget.BaseWidget
@@ -452,14 +586,16 @@ func (r *scalableChartRenderer) Refresh() {
 			bars = append(bars, bar)
 
 			// Net value label on bar
-			netLabel := canvas.NewText(fmt.Sprintf("%+d", net), color.White)
+			labelText := fmt.Sprintf("%+d", net)
+			netLabel := canvas.NewText(labelText, color.White)
 			netLabel.TextSize = 10
 			netLabel.Alignment = fyne.TextAlignCenter
-			labelText := fmt.Sprintf("%+d", net)
-			textWidth := float32(len(labelText)) * 8
-			textHeight := float32(12)
-			labelX := xOffset + (barWidth-textWidth)/2
-			labelY := yPos + (barHeight-textHeight)/2
+
+			// Set text size to bar width and center it
+			textSize := netLabel.MinSize()
+			netLabel.Resize(fyne.NewSize(barWidth, textSize.Height))
+			labelX := xOffset
+			labelY := yPos + (barHeight-textSize.Height)/2
 			netLabel.Move(fyne.NewPos(labelX, labelY))
 			bars = append(bars, netLabel)
 		}
@@ -468,6 +604,108 @@ func (r *scalableChartRenderer) Refresh() {
 		dateLabel := canvas.NewText(st.Label, color.Gray{Y: 150})
 		dateLabel.TextSize = 10
 		dateLabel.Move(fyne.NewPos(xOffset, barBottom+2))
+		bars = append(bars, dateLabel)
+	}
+
+	r.objects = bars
+}
+
+// scalableTimeChart is a custom widget for displaying play time
+type scalableTimeChart struct {
+	widget.BaseWidget
+	stats      []AggregatedStats
+	timeValues []int
+	maxTime    int
+	timeColor  color.Color
+}
+
+func (c *scalableTimeChart) CreateRenderer() fyne.WidgetRenderer {
+	return &scalableTimeChartRenderer{chart: c}
+}
+
+func (c *scalableTimeChart) MinSize() fyne.Size {
+	barWidth := float32(40)
+	spacing := float32(10)
+	totalWidth := float32(len(c.stats)) * (barWidth + spacing)
+	if totalWidth < 300 {
+		totalWidth = 300
+	}
+	return fyne.NewSize(totalWidth, 150)
+}
+
+type scalableTimeChartRenderer struct {
+	chart   *scalableTimeChart
+	objects []fyne.CanvasObject
+}
+
+func (r *scalableTimeChartRenderer) Destroy() {}
+
+func (r *scalableTimeChartRenderer) Layout(size fyne.Size) {
+	r.Refresh()
+}
+
+func (r *scalableTimeChartRenderer) MinSize() fyne.Size {
+	return r.chart.MinSize()
+}
+
+func (r *scalableTimeChartRenderer) Objects() []fyne.CanvasObject {
+	return r.objects
+}
+
+func (r *scalableTimeChartRenderer) Refresh() {
+	c := r.chart
+	size := c.Size()
+
+	// Chart dimensions
+	labelHeight := float32(15)
+	chartHeight := size.Height - labelHeight
+	if chartHeight < 60 {
+		chartHeight = 60
+	}
+	barWidth := float32(40)
+	spacing := float32(10)
+
+	var bars []fyne.CanvasObject
+
+	for i, st := range c.stats {
+		xOffset := float32(i) * (barWidth + spacing)
+		timeMinutes := c.timeValues[i]
+
+		if timeMinutes > 0 {
+			// Calculate bar height proportional to max value
+			barHeight := float32(timeMinutes) / float32(c.maxTime) * chartHeight
+			// Minimum visible height
+			if barHeight < 3 {
+				barHeight = 3
+			}
+
+			// Bar grows upward from bottom
+			yPos := chartHeight - barHeight
+
+			bar := canvas.NewRectangle(c.timeColor)
+			bar.Resize(fyne.NewSize(barWidth, barHeight))
+			bar.Move(fyne.NewPos(xOffset, yPos))
+			bars = append(bars, bar)
+
+			// Time label on bar
+			labelText := formatPlayTime(timeMinutes)
+			timeLabel := canvas.NewText(labelText, color.White)
+			timeLabel.TextSize = 10
+			timeLabel.Alignment = fyne.TextAlignCenter
+
+			// Set text size to bar width and center it
+			textSize := timeLabel.MinSize()
+			timeLabel.Resize(fyne.NewSize(barWidth, textSize.Height))
+			labelX := xOffset
+			labelY := yPos + (barHeight-textSize.Height)/2
+			timeLabel.Move(fyne.NewPos(labelX, labelY))
+			bars = append(bars, timeLabel)
+		}
+
+		// Period label below the bar
+		dateLabel := canvas.NewText(st.Label, color.Gray{Y: 150})
+		dateLabel.TextSize = 10
+		dateLabel.Move(fyne.NewPos(xOffset, chartHeight+2))
 		bars = append(bars, dateLabel)
 	}
 
