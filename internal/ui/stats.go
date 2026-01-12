@@ -44,10 +44,10 @@ type StatsTab struct {
 	chartContainer *fyne.Container
 
 	// Play Time sub-tab
-	totalTimeLabel  *widget.Label
-	ctTimeLabel     *widget.Label
-	tTimeLabel      *widget.Label
-	timeChartLabel  *widget.Label
+	totalTimeLabel     *widget.Label
+	ctTimeLabel        *widget.Label
+	tTimeLabel         *widget.Label
+	timeChartLabel     *widget.Label
 	timeChartContainer *fyne.Container
 }
 
