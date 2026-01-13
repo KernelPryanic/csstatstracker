@@ -217,8 +217,8 @@ func (s *StatsTab) refresh() {
 	s.ctWinRateLabel.SetText(fmt.Sprintf("CT: %.1f%% (%d/%d games)", stats.CTWinRate, stats.CTWins, stats.CTGames))
 	s.tWinRateLabel.SetText(fmt.Sprintf("T: %.1f%% (%d/%d games)", stats.TWinRate, stats.TWins, stats.TGames))
 
-	// Calculate Play Time (33 minutes per game)
-	const minutesPerGame = 33
+	// Calculate Play Time (27 minutes per game)
+	const minutesPerGame = 27
 	totalMinutes := stats.TotalGames * minutesPerGame
 	ctMinutes := stats.CTGames * minutesPerGame
 	tMinutes := stats.TGames * minutesPerGame
@@ -440,7 +440,7 @@ func (s *StatsTab) buildTimeChart(stats []AggregatedStats) fyne.CanvasObject {
 		return container.NewCenter(noDataLabel)
 	}
 
-	const minutesPerGame = 33
+	const minutesPerGame = 27
 
 	// Calculate time values in minutes and find max value for scaling
 	timeValues := make([]int, len(stats))
