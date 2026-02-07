@@ -66,6 +66,7 @@ func New(db *sql.DB, w fyne.Window, cfg *config.Config, ctLabel, tLabel *canvas.
 		Reset:       cfg.Hotkeys.Reset,
 		SelectCT:    cfg.Hotkeys.SelectCT,
 		SelectT:     cfg.Hotkeys.SelectT,
+		SwapTeams:   cfg.Hotkeys.SwapTeams,
 	}
 	t.hotkey = hotkey.NewHandler(bindings)
 
@@ -98,6 +99,8 @@ func (t *Tracker) StartHotkeys() {
 				t.SelectCT()
 			case hotkey.ActionSelectT:
 				t.SelectT()
+			case hotkey.ActionSwapTeams:
+				t.SwapTeams()
 			}
 		}
 	}()
@@ -128,6 +131,7 @@ func (t *Tracker) UpdateHotkeys() {
 		Reset:       t.Config.Hotkeys.Reset,
 		SelectCT:    t.Config.Hotkeys.SelectCT,
 		SelectT:     t.Config.Hotkeys.SelectT,
+		SwapTeams:   t.Config.Hotkeys.SwapTeams,
 	}
 	t.hotkey.UpdateBindings(bindings)
 }
@@ -156,6 +160,35 @@ func (t *Tracker) SelectT() {
 		fyne.Do(func() {
 			t.onTeamChange(database.TeamT)
 		})
+	}
+}
+
+// SwapTeams swaps the player's team and counter values
+func (t *Tracker) SwapTeams() {
+	// Swap counter values
+	t.ctWins, t.tWins = t.tWins, t.ctWins
+	t.updateLabels()
+
+	// Swap team
+	switch t.team {
+	case database.TeamCT:
+		t.team = database.TeamT
+		t.sound.PlayTSelect()
+		if t.onTeamChange != nil {
+			fyne.Do(func() {
+				t.onTeamChange(database.TeamT)
+			})
+		}
+	case database.TeamT:
+		t.team = database.TeamCT
+		t.sound.PlayCTSelect()
+		if t.onTeamChange != nil {
+			fyne.Do(func() {
+				t.onTeamChange(database.TeamCT)
+			})
+		}
+	default:
+		// No team selected, just swap counters without sound
 	}
 }
 

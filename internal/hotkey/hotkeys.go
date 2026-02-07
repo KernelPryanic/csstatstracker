@@ -22,6 +22,7 @@ const (
 	ActionReset
 	ActionSelectCT
 	ActionSelectT
+	ActionSwapTeams
 )
 
 // Bindings holds the key combinations for each action
@@ -33,6 +34,7 @@ type Bindings struct {
 	Reset       []string
 	SelectCT    []string
 	SelectT     []string
+	SwapTeams   []string
 }
 
 // Handler processes keyboard events and triggers actions
@@ -133,6 +135,8 @@ func (h *Handler) handleKeyDown(keyName string) {
 		action = ActionSelectCT
 	} else if h.matchesCombo(h.bindings.SelectT) {
 		action = ActionSelectT
+	} else if h.matchesCombo(h.bindings.SwapTeams) {
+		action = ActionSwapTeams
 	}
 
 	if action != ActionNone {

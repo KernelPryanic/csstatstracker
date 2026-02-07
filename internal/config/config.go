@@ -17,6 +17,7 @@ type Hotkeys struct {
 	Reset       []string `json:"reset"`
 	SelectCT    []string `json:"select_ct"`
 	SelectT     []string `json:"select_t"`
+	SwapTeams   []string `json:"swap_teams"`
 }
 
 // Config holds the application configuration

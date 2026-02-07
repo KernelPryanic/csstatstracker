@@ -147,6 +147,10 @@ func main() {
 	)
 
 	// Create action buttons
+	swapButton := widget.NewButton("Swap Teams", func() {
+		t.SwapTeams()
+	})
+
 	resetButton := widget.NewButton("Reset", func() {
 		t.Reset()
 	})
@@ -154,6 +158,7 @@ func main() {
 
 	actionButtonsContainer := container.NewHBox(
 		layout.NewSpacer(),
+		swapButton,
 		resetButton,
 		layout.NewSpacer(),
 	)

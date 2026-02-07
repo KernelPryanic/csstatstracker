@@ -13,5 +13,6 @@ func defaultHotkeys() Hotkeys {
 		Reset:       []string{"0", "Return"},
 		SelectCT:    []string{"LeftControl", "C"},
 		SelectT:     []string{"LeftControl", "T"},
+		SwapTeams:   []string{"LeftControl", "S"},
 	}
 }

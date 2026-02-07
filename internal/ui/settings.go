@@ -65,7 +65,7 @@ func (s *SettingsTab) buildUI() fyne.CanvasObject {
 	trayCheck.Checked = s.cfg.MinimizeToTray
 
 	// Create buttons for each hotkey
-	var incCTButton, decCTButton, incTButton, decTButton, resetHotkeyButton, selectCTButton, selectTButton *widget.Button
+	var incCTButton, decCTButton, incTButton, decTButton, resetHotkeyButton, selectCTButton, selectTButton, swapTeamsButton *widget.Button
 
 	incCTButton = widget.NewButton(FormatHotkeys(s.cfg.Hotkeys.IncrementCT), func() {
 		CaptureHotkey(s.window, "Increment CT", &s.cfg.Hotkeys.IncrementCT, incCTButton, s.save)
@@ -95,6 +95,10 @@ func (s *SettingsTab) buildUI() fyne.CanvasObject {
 		CaptureHotkey(s.window, "Select T Team", &s.cfg.Hotkeys.SelectT, selectTButton, s.save)
 	})
 
+	swapTeamsButton = widget.NewButton(FormatHotkeys(s.cfg.Hotkeys.SwapTeams), func() {
+		CaptureHotkey(s.window, "Swap Teams", &s.cfg.Hotkeys.SwapTeams, swapTeamsButton, s.save)
+	})
+
 	form := container.NewVBox(
 		soundCheck,
 		volumeRow,
@@ -109,6 +113,7 @@ func (s *SettingsTab) buildUI() fyne.CanvasObject {
 			widget.NewFormItem("Reset", resetHotkeyButton),
 			widget.NewFormItem("Select CT Team", selectCTButton),
 			widget.NewFormItem("Select T Team", selectTButton),
+			widget.NewFormItem("Swap Teams", swapTeamsButton),
 		),
 	)
 
