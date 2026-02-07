@@ -10,9 +10,9 @@ func defaultHotkeys() Hotkeys {
 		DecrementCT: []string{"1", "-"},
 		IncrementT:  []string{"2", "+"},
 		DecrementT:  []string{"2", "-"},
-		Reset:       []string{"0", "Return"},
+		Reset:       []string{"0", "KP_Enter"},
 		SelectCT:    []string{"LeftControl", "C"},
 		SelectT:     []string{"LeftControl", "T"},
-		SwapTeams:   []string{".", "Return"},
+		SwapTeams:   []string{".", "KP_Enter"},
 	}
 }

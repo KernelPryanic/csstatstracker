@@ -159,9 +159,9 @@ func (h *Handler) matchesCombo(comboKeys []string) bool {
 	// All keys in the combo must be pressed (case-insensitive for letters)
 	for _, key := range comboKeys {
 		found := false
-		keyLower := strings.ToLower(key)
+		keyNorm := normalizeKey(key)
 		for pressedKey := range h.pressedKeys {
-			if strings.ToLower(pressedKey) == keyLower {
+			if normalizeKey(pressedKey) == keyNorm {
 				found = true
 				break
 			}
@@ -172,6 +172,17 @@ func (h *Handler) matchesCombo(comboKeys []string) bool {
 	}
 	// And we must have exactly the same number of keys pressed
 	return len(h.pressedKeys) == len(comboKeys)
+}
+
+// normalizeKey normalizes key names to handle platform differences
+// (e.g., Fyne captures "KP_Enter" but gohook returns "Return" on Windows)
+func normalizeKey(key string) string {
+	lower := strings.ToLower(key)
+	// Normalize numpad enter variants to "return"
+	if lower == "kp_enter" || lower == "numpadenter" {
+		return "return"
+	}
+	return lower
 }
 
 // mapKeyToName is defined in platform-specific files:

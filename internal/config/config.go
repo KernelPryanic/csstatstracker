@@ -60,10 +60,31 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
 
-	// Ensure hotkeys are set if missing
+	// Ensure all hotkeys are set if missing (for app upgrades)
+	def := Default()
 	if len(cfg.Hotkeys.IncrementCT) == 0 {
-		def := Default()
-		cfg.Hotkeys = def.Hotkeys
+		cfg.Hotkeys.IncrementCT = def.Hotkeys.IncrementCT
+	}
+	if len(cfg.Hotkeys.DecrementCT) == 0 {
+		cfg.Hotkeys.DecrementCT = def.Hotkeys.DecrementCT
+	}
+	if len(cfg.Hotkeys.IncrementT) == 0 {
+		cfg.Hotkeys.IncrementT = def.Hotkeys.IncrementT
+	}
+	if len(cfg.Hotkeys.DecrementT) == 0 {
+		cfg.Hotkeys.DecrementT = def.Hotkeys.DecrementT
+	}
+	if len(cfg.Hotkeys.Reset) == 0 {
+		cfg.Hotkeys.Reset = def.Hotkeys.Reset
+	}
+	if len(cfg.Hotkeys.SelectCT) == 0 {
+		cfg.Hotkeys.SelectCT = def.Hotkeys.SelectCT
+	}
+	if len(cfg.Hotkeys.SelectT) == 0 {
+		cfg.Hotkeys.SelectT = def.Hotkeys.SelectT
+	}
+	if len(cfg.Hotkeys.SwapTeams) == 0 {
+		cfg.Hotkeys.SwapTeams = def.Hotkeys.SwapTeams
 	}
 
 	// Ensure sound volume is set if missing (0 means not set in config)
