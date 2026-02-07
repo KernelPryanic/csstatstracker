@@ -176,7 +176,11 @@ func main() {
 	)
 
 	// Create history tab
-	statsTab := ui.NewStatsTab(db, w)
+	statsTab := ui.NewStatsTab(db, w, cfg, func() {
+		if err := config.Save(cfg, config.DefaultConfigFile); err != nil {
+			fyne.LogError("Failed to save config", err)
+		}
+	})
 	historyTab := ui.NewHistoryTab(db, w, func() {
 		statsTab.Refresh()
 	})

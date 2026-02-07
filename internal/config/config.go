@@ -27,6 +27,8 @@ type Config struct {
 	SoundVolume    float64 `json:"sound_volume"`
 	MinimizeToTray bool    `json:"minimize_to_tray"`
 	Hotkeys        Hotkeys `json:"hotkeys"`
+	StatsPeriod    string  `json:"stats_period"`
+	StatsGroup     string  `json:"stats_group"`
 }
 
 // Default returns the default configuration
@@ -38,6 +40,8 @@ func Default() *Config {
 		SoundVolume:    1.0,
 		MinimizeToTray: false,
 		Hotkeys:        defaultHotkeys(),
+		StatsPeriod:    "All Time",
+		StatsGroup:     "By Day",
 	}
 }
 
@@ -65,6 +69,14 @@ func Load(path string) (*Config, error) {
 	// Ensure sound volume is set if missing (0 means not set in config)
 	if cfg.SoundVolume == 0 {
 		cfg.SoundVolume = 1.0
+	}
+
+	// Ensure stats settings are set if missing
+	if cfg.StatsPeriod == "" {
+		cfg.StatsPeriod = "All Time"
+	}
+	if cfg.StatsGroup == "" {
+		cfg.StatsGroup = "By Day"
 	}
 
 	return &cfg, nil

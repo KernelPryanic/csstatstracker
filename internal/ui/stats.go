@@ -11,6 +11,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 
+	"csstatstracker/internal/config"
 	"csstatstracker/internal/database"
 )
 
@@ -28,6 +29,8 @@ const (
 type StatsTab struct {
 	db            *sql.DB
 	window        fyne.Window
+	cfg           *config.Config
+	onSave        func()
 	currentWindow database.TimeWindow
 	aggregation   AggregationInterval
 	container     *fyne.Container
@@ -52,14 +55,49 @@ type StatsTab struct {
 }
 
 // NewStatsTab creates a new statistics tab
-func NewStatsTab(db *sql.DB, window fyne.Window) *StatsTab {
+func NewStatsTab(db *sql.DB, window fyne.Window, cfg *config.Config, onSave func()) *StatsTab {
 	s := &StatsTab{
-		db:            db,
-		window:        window,
-		currentWindow: database.WindowAll,
-		aggregation:   AggregateByDay,
+		db:     db,
+		window: window,
+		cfg:    cfg,
+		onSave: onSave,
 	}
+
+	// Initialize from config
+	s.currentWindow = s.periodToWindow(cfg.StatsPeriod)
+	s.aggregation = s.groupToAggregation(cfg.StatsGroup)
+
 	return s
+}
+
+// periodToWindow converts a period string to TimeWindow
+func (s *StatsTab) periodToWindow(period string) database.TimeWindow {
+	switch period {
+	case "Day":
+		return database.WindowDay
+	case "Week":
+		return database.WindowWeek
+	case "Month":
+		return database.WindowMonth
+	case "Year":
+		return database.WindowYear
+	default:
+		return database.WindowAll
+	}
+}
+
+// groupToAggregation converts a group string to AggregationInterval
+func (s *StatsTab) groupToAggregation(group string) AggregationInterval {
+	switch group {
+	case "By Week":
+		return AggregateByWeek
+	case "By Month":
+		return AggregateByMonth
+	case "By Year":
+		return AggregateByYear
+	default:
+		return AggregateByDay
+	}
 }
 
 // Container returns the tab content
@@ -83,42 +121,30 @@ func (s *StatsTab) Container() fyne.CanvasObject {
 	windowSelect := widget.NewSelect(
 		[]string{"Day", "Week", "Month", "Year", "All Time"},
 		func(selected string) {
-			switch selected {
-			case "Day":
-				s.currentWindow = database.WindowDay
-			case "Week":
-				s.currentWindow = database.WindowWeek
-			case "Month":
-				s.currentWindow = database.WindowMonth
-			case "Year":
-				s.currentWindow = database.WindowYear
-			default:
-				s.currentWindow = database.WindowAll
+			s.currentWindow = s.periodToWindow(selected)
+			s.cfg.StatsPeriod = selected
+			if s.onSave != nil {
+				s.onSave()
 			}
 			s.refresh()
 		},
 	)
-	windowSelect.SetSelected("All Time")
+	windowSelect.SetSelected(s.cfg.StatsPeriod)
 
 	// Aggregation selector
 	aggregationSelect := widget.NewSelect(
 		[]string{"By Day", "By Week", "By Month", "By Year"},
 		func(selected string) {
-			switch selected {
-			case "By Week":
-				s.aggregation = AggregateByWeek
-			case "By Month":
-				s.aggregation = AggregateByMonth
-			case "By Year":
-				s.aggregation = AggregateByYear
-			default:
-				s.aggregation = AggregateByDay
+			s.aggregation = s.groupToAggregation(selected)
+			s.cfg.StatsGroup = selected
+			if s.onSave != nil {
+				s.onSave()
 			}
 			s.updateChartLabels()
 			s.refresh()
 		},
 	)
-	aggregationSelect.SetSelected("By Day")
+	aggregationSelect.SetSelected(s.cfg.StatsGroup)
 
 	// Shared controls (Period and Group)
 	controlsPanel := container.NewHBox(
