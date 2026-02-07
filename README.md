@@ -52,7 +52,7 @@ fyne-cross windows -arch=amd64 ./cmd/
 | Reset | Numpad0 + NumpadEnter | 0 + Enter |
 | Select CT | Ctrl + C | Ctrl + C |
 | Select T | Ctrl + T | Ctrl + T |
-| Swap Teams | Ctrl + S | Ctrl + S |
+| Swap Teams | NumpadDecimal + NumpadEnter | . + Enter |
 
 All hotkeys can be customized in **Settings**.
 
