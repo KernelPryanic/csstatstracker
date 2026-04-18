@@ -4,8 +4,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"image/color"
+	"os"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -18,11 +20,25 @@ import (
 	csstatstracker "csstatstracker"
 	"csstatstracker/internal/config"
 	"csstatstracker/internal/database"
+	"csstatstracker/internal/singleinstance"
 	"csstatstracker/internal/tracker"
 	"csstatstracker/internal/ui"
 )
 
+// singleInstancePort is a fixed loopback port used as a cross-platform mutex.
+const singleInstancePort = 53017
+
 func main() {
+	lock, err := singleinstance.Acquire(singleInstancePort)
+	if err != nil {
+		if errors.Is(err, singleinstance.ErrAlreadyRunning) {
+			fmt.Fprintln(os.Stderr, "CS Stats Tracker is already running.")
+			os.Exit(1)
+		}
+		panic(fmt.Errorf("failed to acquire single-instance lock: %w", err))
+	}
+	defer lock.Release()
+
 	ctx := context.Background()
 
 	// Load configuration
