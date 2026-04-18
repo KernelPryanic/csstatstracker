@@ -19,7 +19,7 @@ func mapKeyToName(ev hook.Event) string {
 	// Fallback: use keychar for printable characters
 	if ev.Keychar >= 32 && ev.Keychar <= 126 {
 		// Return uppercase for letters to match Fyne key names
-		return strings.ToUpper(string(rune(ev.Keychar)))
+		return strings.ToUpper(string(ev.Keychar))
 	}
 
 	return ""

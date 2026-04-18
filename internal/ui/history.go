@@ -450,7 +450,7 @@ func (h *HistoryTab) showAddDialog() {
 // roundEdit tracks a single round inside the edit dialog. Changes are staged
 // and applied as a batch when the user hits Save.
 type roundEdit struct {
-	id        int            // 0 for newly added rounds
+	id        int // 0 for newly added rounds
 	winner    database.Team
 	createdAt time.Time
 	deleted   bool

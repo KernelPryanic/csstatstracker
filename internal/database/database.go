@@ -442,6 +442,10 @@ func GetDailyRoundStats(ctx context.Context, db *sql.DB, window TimeWindow) ([]D
 		}
 		addRound(day, Team(winner), Team(team))
 	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return nil, fmt.Errorf("failed iterating daily rounds: %w", err)
+	}
 	_ = rows.Close()
 
 	// Legacy games without rounds.
@@ -471,6 +475,10 @@ func GetDailyRoundStats(ctx context.Context, db *sql.DB, window TimeWindow) ([]D
 		for i := 0; i < t; i++ {
 			addRound(day, TeamT, playerTeam)
 		}
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return nil, fmt.Errorf("failed iterating legacy daily: %w", err)
 	}
 	_ = rows.Close()
 
