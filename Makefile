@@ -57,13 +57,13 @@ ifdef IS_WIN
 FYNE := $(shell command -v fyne 2>/dev/null)
 
 build:
-	@echo "==> Building $(BIN_NAME) (windows, packaged)..."
+	@echo "==> Building $(BIN_NAME) (windows, release)..."
 	@mkdir -p $(BIN_DIR)
 ifeq ($(FYNE),)
 	@echo "    Installing fyne CLI..."
 	$(GO) install fyne.io/tools/cmd/fyne@latest
 endif
-	CGO_ENABLED=$(CGO_ENABLED) fyne package -os windows -src ./cmd -icon $(CURDIR)/Icon.png -name $(BIN_NAME)
+	CGO_ENABLED=$(CGO_ENABLED) fyne package -os windows --release --app-id com.csstatstracker.app -src ./cmd -icon $(CURDIR)/Icon.png -name $(BIN_NAME)
 	@mv -f cmd/$(BIN_NAME).exe $(BINARY) 2>/dev/null || mv -f $(BIN_NAME).exe $(BINARY)
 	@echo "    Built: $(BINARY)"
 

@@ -26,8 +26,18 @@ jobs:
       - name: Install fyne-cross
         run: go install github.com/fyne-io/fyne-cross@latest
 
+      - name: Inject version from git tag into FyneApp.toml
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          # Bump Build number using the commit count so every release is unique.
+          BUILD=$(git rev-list --count HEAD)
+          sed -i -E "s/^Version = \".*\"/Version = \"${VERSION}\"/" FyneApp.toml
+          sed -i -E "s/^Build = .*/Build = ${BUILD}/" FyneApp.toml
+          echo "--- FyneApp.toml after injection ---"
+          cat FyneApp.toml
+
       - name: Build Windows binary
-        run: fyne-cross windows -arch=amd64 ./cmd/
+        run: fyne-cross windows -arch=amd64 --release --app-id com.csstatstracker.app ./cmd/
 
       - name: Prepare Windows artifact
         run: |
