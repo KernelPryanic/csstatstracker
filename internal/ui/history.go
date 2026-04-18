@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"image/color"
 	"strconv"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -13,6 +14,7 @@ import (
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/layout"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 
 	"csstatstracker/internal/database"
@@ -24,12 +26,15 @@ var (
 )
 
 // selectableRow is a tappable row that supports selection with highlighting
+// and an inline-expandable rounds panel beneath the header.
 type selectableRow struct {
 	widget.BaseWidget
 	background *canvas.Rectangle
 	label      *widget.Label
 	editBtn    *widget.Button
 	delBtn     *widget.Button
+	expandBtn  *widget.Button
+	roundsBox  *fyne.Container
 	content    *fyne.Container
 
 	rowIdx     int
@@ -44,16 +49,24 @@ func newSelectableRow(h *HistoryTab) *selectableRow {
 		label:      widget.NewLabel("template"),
 		editBtn:    widget.NewButton("Edit", nil),
 		delBtn:     widget.NewButton("Delete", nil),
+		expandBtn:  widget.NewButton("▸", nil),
+		roundsBox:  container.NewVBox(),
 	}
+	r.expandBtn.Importance = widget.LowImportance
+	r.roundsBox.Hide()
 	r.ExtendBaseWidget(r)
 
-	row := container.NewHBox(
-		r.label,
-		layout.NewSpacer(),
-		r.editBtn,
-		r.delBtn,
+	header := container.NewStack(
+		r.background,
+		container.NewHBox(
+			r.expandBtn,
+			r.label,
+			layout.NewSpacer(),
+			r.editBtn,
+			r.delBtn,
+		),
 	)
-	r.content = container.NewStack(r.background, row)
+	r.content = container.NewVBox(header, r.roundsBox)
 	return r
 }
 
@@ -94,7 +107,7 @@ func (r *selectableRow) MouseIn(e *desktop.MouseEvent) {
 				if r.rowIdx >= 0 && r.rowIdx < len(r.history.games) {
 					r.history.selected[r.history.games[r.rowIdx].ID] = true
 					r.history.updateToolbar()
-					r.history.list.Refresh()
+					r.history.refreshRows()
 				}
 			}
 		}
@@ -118,9 +131,11 @@ func (r *selectableRow) SetSelected(selected bool) {
 type HistoryTab struct {
 	db             *sql.DB
 	window         fyne.Window
-	list           *widget.List
+	listBox        *fyne.Container // plain VBox of selectableRows; allows variable heights
+	rows           []*selectableRow
 	games          []database.GameStats
 	selected       map[int]bool
+	expanded       map[int]bool
 	lastClickedIdx int
 	onUpdate       func()
 	deleteBtn      *widget.Button
@@ -135,6 +150,7 @@ func NewHistoryTab(db *sql.DB, window fyne.Window, onUpdate func()) *HistoryTab 
 		window:         window,
 		onUpdate:       onUpdate,
 		selected:       make(map[int]bool),
+		expanded:       make(map[int]bool),
 		lastClickedIdx: -1,
 	}
 	h.refresh()
@@ -143,66 +159,8 @@ func NewHistoryTab(db *sql.DB, window fyne.Window, onUpdate func()) *HistoryTab 
 
 // Container returns the tab content
 func (h *HistoryTab) Container() fyne.CanvasObject {
-	h.list = widget.NewList(
-		func() int {
-			return len(h.games)
-		},
-		func() fyne.CanvasObject {
-			return newSelectableRow(h)
-		},
-		func(id widget.ListItemID, obj fyne.CanvasObject) {
-			if id >= len(h.games) {
-				return
-			}
-			game := h.games[id]
-			gameID := game.ID
-			rowIdx := id
-
-			row := obj.(*selectableRow)
-			row.rowIdx = rowIdx
-			row.history = h
-
-			dateStr := game.CreatedAt.Format("2006-01-02 15:04")
-			winner := "Draw"
-			if game.CTScore > game.TScore {
-				winner = "CT"
-			} else if game.TScore > game.CTScore {
-				winner = "T"
-			}
-			teamStr := "None"
-			if game.Team != "" {
-				teamStr = string(game.Team)
-			}
-			row.label.SetText(fmt.Sprintf("%s | CT:%d T:%d (max:%d) %s [%s]", dateStr, game.CTScore, game.TScore, game.GameScore, winner, teamStr))
-
-			// Update selection highlight
-			row.SetSelected(h.selected[gameID])
-
-			// Enable/disable edit based on selection count
-			selectedCount := len(h.selected)
-			if selectedCount > 1 {
-				row.editBtn.Disable()
-			} else {
-				row.editBtn.Enable()
-			}
-
-			row.editBtn.OnTapped = func() {
-				if len(h.selected) <= 1 {
-					h.showEditDialog(&game)
-				}
-			}
-			row.delBtn.OnTapped = func() {
-				h.confirmDelete(&game)
-			}
-		},
-	)
-
-	// Disable separators and list's own selection
-	h.list.HideSeparators = true
-	h.list.OnSelected = func(id widget.ListItemID) {
-		// Deselect in list widget (we manage our own selection)
-		h.list.UnselectAll()
-	}
+	h.listBox = container.NewVBox()
+	h.refreshRows()
 
 	addBtn := widget.NewButton("+ Add Game", func() {
 		h.showAddDialog()
@@ -223,14 +181,14 @@ func (h *HistoryTab) Container() fyne.CanvasObject {
 			h.lastClickedIdx = 0
 		}
 		h.updateToolbar()
-		h.list.Refresh()
+		h.refreshRows()
 	})
 
 	h.clearBtn = widget.NewButton("Clear Selection", func() {
 		h.selected = make(map[int]bool)
 		h.lastClickedIdx = -1
 		h.updateToolbar()
-		h.list.Refresh()
+		h.refreshRows()
 	})
 	h.clearBtn.Hide()
 
@@ -240,7 +198,76 @@ func (h *HistoryTab) Container() fyne.CanvasObject {
 
 	toolbar := container.NewHBox(addBtn, h.deleteBtn, h.selectAllBtn, h.clearBtn, refreshBtn)
 
-	return container.NewBorder(toolbar, nil, nil, nil, h.list)
+	scroll := container.NewVScroll(h.listBox)
+	return container.NewBorder(toolbar, nil, nil, nil, scroll)
+}
+
+// refreshRows rebuilds the list of selectableRow widgets to match h.games and
+// the current expanded/selected state. Used in place of widget.List so that
+// rows may have variable heights without recycling glitches.
+func (h *HistoryTab) refreshRows() {
+	if h.listBox == nil {
+		return
+	}
+	// Grow/shrink the row slice to match game count.
+	for len(h.rows) < len(h.games) {
+		h.rows = append(h.rows, newSelectableRow(h))
+	}
+	if len(h.rows) > len(h.games) {
+		h.rows = h.rows[:len(h.games)]
+	}
+
+	h.listBox.Objects = h.listBox.Objects[:0]
+	for i := range h.games {
+		game := h.games[i]
+		gameID := game.ID
+		row := h.rows[i]
+		row.rowIdx = i
+		row.history = h
+
+		dateStr := game.CreatedAt.Format("2006-01-02 15:04")
+		winner := "Draw"
+		if game.CTScore > game.TScore {
+			winner = "CT"
+		} else if game.TScore > game.CTScore {
+			winner = "T"
+		}
+		teamStr := "None"
+		if game.Team != "" {
+			teamStr = string(game.Team)
+		}
+		row.label.SetText(fmt.Sprintf("%s | CT:%d T:%d (max:%d) %s [%s]",
+			dateStr, game.CTScore, game.TScore, game.GameScore, winner, teamStr))
+
+		row.SetSelected(h.selected[gameID])
+
+		if len(h.selected) > 1 {
+			row.editBtn.Disable()
+		} else {
+			row.editBtn.Enable()
+		}
+
+		gameCopy := game
+		row.editBtn.OnTapped = func() {
+			if len(h.selected) <= 1 {
+				h.showEditDialog(&gameCopy)
+			}
+		}
+		row.delBtn.OnTapped = func() { h.confirmDelete(&gameCopy) }
+		row.expandBtn.OnTapped = func() { h.toggleExpanded(gameID) }
+
+		if h.expanded[gameID] {
+			row.expandBtn.SetText("▾")
+			h.populateRounds(row, game)
+			row.roundsBox.Show()
+		} else {
+			row.expandBtn.SetText("▸")
+			row.roundsBox.Hide()
+		}
+
+		h.listBox.Add(row)
+	}
+	h.listBox.Refresh()
 }
 
 // selectSingle clears selection and selects only the clicked item
@@ -260,7 +287,7 @@ func (h *HistoryTab) selectSingle(idx int) {
 	}
 	h.lastClickedIdx = idx
 	h.updateToolbar()
-	h.list.Refresh()
+	h.refreshRows()
 }
 
 // selectRange selects all items between lastClickedIdx and the current index
@@ -282,7 +309,7 @@ func (h *HistoryTab) selectRange(toIdx int) {
 		}
 	}
 	h.updateToolbar()
-	h.list.Refresh()
+	h.refreshRows()
 }
 
 func (h *HistoryTab) updateToolbar() {
@@ -301,6 +328,62 @@ func (h *HistoryTab) updateToolbar() {
 	}
 }
 
+// toggleExpanded flips the expansion state for a game row and re-renders.
+func (h *HistoryTab) toggleExpanded(gameID int) {
+	if h.expanded[gameID] {
+		delete(h.expanded, gameID)
+	} else {
+		h.expanded[gameID] = true
+	}
+	h.refreshRows()
+}
+
+// populateRounds fills a row's rounds panel with one canvas.Text per round.
+// Using canvas.Text directly (rather than widget.Label) avoids widget padding
+// and gives a denser list.
+func (h *HistoryTab) populateRounds(row *selectableRow, game database.GameStats) {
+	rounds, err := database.GetRoundsForGame(context.Background(), h.db, game.ID)
+	row.roundsBox.Objects = row.roundsBox.Objects[:0]
+	if err != nil {
+		row.roundsBox.Add(widget.NewLabel(fmt.Sprintf("Error loading rounds: %v", err)))
+		row.roundsBox.Refresh()
+		return
+	}
+	if len(rounds) == 0 {
+		row.roundsBox.Add(widget.NewLabel("No round timestamps recorded for this game."))
+		row.roundsBox.Refresh()
+		return
+	}
+	textColor := theme.Color(theme.ColorNameForeground)
+	for i, r := range rounds {
+		outcome := "draw"
+		switch game.Team {
+		case database.TeamCT:
+			if r.Winner == database.TeamCT {
+				outcome = "won"
+			} else {
+				outcome = "lost"
+			}
+		case database.TeamT:
+			if r.Winner == database.TeamT {
+				outcome = "won"
+			} else {
+				outcome = "lost"
+			}
+		}
+		t := canvas.NewText(fmt.Sprintf(
+			"  #%d  %s  %s won  (%s)",
+			i+1,
+			r.CreatedAt.Format("15:04:05"),
+			r.Winner,
+			outcome,
+		), textColor)
+		t.TextSize = theme.TextSize()
+		row.roundsBox.Add(t)
+	}
+	row.roundsBox.Refresh()
+}
+
 // Refresh reloads data from database
 func (h *HistoryTab) Refresh() {
 	h.refresh()
@@ -317,9 +400,7 @@ func (h *HistoryTab) refresh() {
 	h.selected = make(map[int]bool)
 	h.lastClickedIdx = -1
 	h.updateToolbar()
-	if h.list != nil {
-		h.list.Refresh()
-	}
+	h.refreshRows()
 }
 
 func (h *HistoryTab) showAddDialog() {
@@ -355,7 +436,7 @@ func (h *HistoryTab) showAddDialog() {
 		}
 
 		ctx := context.Background()
-		if err := database.SaveGame(ctx, h.db, ct, t, max, team); err != nil {
+		if _, err := database.SaveGame(ctx, h.db, ct, t, max, team); err != nil {
 			dialog.ShowError(err, h.window)
 			return
 		}
@@ -366,11 +447,17 @@ func (h *HistoryTab) showAddDialog() {
 	}, h.window)
 }
 
+// roundEdit tracks a single round inside the edit dialog. Changes are staged
+// and applied as a batch when the user hits Save.
+type roundEdit struct {
+	id        int            // 0 for newly added rounds
+	winner    database.Team
+	createdAt time.Time
+	deleted   bool
+	dirty     bool // existing round whose winner was changed
+}
+
 func (h *HistoryTab) showEditDialog(game *database.GameStats) {
-	ctEntry := widget.NewEntry()
-	ctEntry.SetText(strconv.Itoa(game.CTScore))
-	tEntry := widget.NewEntry()
-	tEntry.SetText(strconv.Itoa(game.TScore))
 	maxEntry := widget.NewEntry()
 	maxEntry.SetText(strconv.Itoa(game.GameScore))
 	teamSelect := widget.NewSelect([]string{"None", "CT", "T"}, nil)
@@ -381,18 +468,94 @@ func (h *HistoryTab) showEditDialog(game *database.GameStats) {
 	}
 
 	form := widget.NewForm(
-		widget.NewFormItem("CT Score", ctEntry),
-		widget.NewFormItem("T Score", tEntry),
 		widget.NewFormItem("Game Score", maxEntry),
 		widget.NewFormItem("Player's Team", teamSelect),
 	)
 
-	dialog.ShowCustomConfirm("Edit Game", "Save", "Cancel", form, func(save bool) {
+	// Load existing rounds into a working copy.
+	ctx := context.Background()
+	existing, err := database.GetRoundsForGame(ctx, h.db, game.ID)
+	if err != nil {
+		dialog.ShowError(err, h.window)
+		return
+	}
+	edits := make([]*roundEdit, 0, len(existing))
+	for _, r := range existing {
+		edits = append(edits, &roundEdit{
+			id:        r.ID,
+			winner:    r.Winner,
+			createdAt: r.CreatedAt,
+		})
+	}
+
+	roundsList := container.NewVBox()
+	var rebuildRounds func()
+	rebuildRounds = func() {
+		roundsList.Objects = roundsList.Objects[:0]
+		visibleIdx := 0
+		for _, e := range edits {
+			if e.deleted {
+				continue
+			}
+			visibleIdx++
+			edit := e
+			num := widget.NewLabel(fmt.Sprintf("#%d", visibleIdx))
+			ts := widget.NewLabel(edit.createdAt.Format("15:04:05"))
+			sel := widget.NewSelect([]string{"CT", "T"}, func(v string) {
+				if database.Team(v) != edit.winner {
+					edit.winner = database.Team(v)
+					edit.dirty = true
+				}
+			})
+			sel.SetSelected(string(edit.winner))
+			del := widget.NewButton("×", func() {
+				edit.deleted = true
+				rebuildRounds()
+			})
+			del.Importance = widget.DangerImportance
+			roundsList.Add(container.NewBorder(nil, nil,
+				container.NewHBox(num, ts),
+				del,
+				sel,
+			))
+		}
+		if visibleIdx == 0 {
+			hint := widget.NewLabel("No rounds recorded.")
+			hint.Alignment = fyne.TextAlignCenter
+			roundsList.Add(hint)
+		}
+		roundsList.Refresh()
+	}
+	rebuildRounds()
+
+	addCTBtn := widget.NewButton("+ CT Round", func() {
+		edits = append(edits, &roundEdit{winner: database.TeamCT, createdAt: time.Now()})
+		rebuildRounds()
+	})
+	addTBtn := widget.NewButton("+ T Round", func() {
+		edits = append(edits, &roundEdit{winner: database.TeamT, createdAt: time.Now()})
+		rebuildRounds()
+	})
+
+	addButtons := container.NewHBox(layout.NewSpacer(), addCTBtn, addTBtn, layout.NewSpacer())
+
+	// Keep a baseline visible area for the round list so the dialog feels
+	// consistent regardless of round count; scrolling kicks in past this.
+	roundsScroll := container.NewVScroll(roundsList)
+	roundsScroll.SetMinSize(fyne.NewSize(360, 180))
+
+	content := container.NewVBox(
+		form,
+		widget.NewSeparator(),
+		widget.NewLabel("Rounds:"),
+		roundsScroll,
+		addButtons,
+	)
+
+	d := dialog.NewCustomConfirm("Edit Game", "Save", "Cancel", content, func(save bool) {
 		if !save {
 			return
 		}
-		ct, _ := strconv.Atoi(ctEntry.Text)
-		t, _ := strconv.Atoi(tEntry.Text)
 		max, _ := strconv.Atoi(maxEntry.Text)
 		if max <= 0 {
 			max = 8
@@ -402,16 +565,51 @@ func (h *HistoryTab) showEditDialog(game *database.GameStats) {
 			team = database.Team(teamSelect.Selected)
 		}
 
-		ctx := context.Background()
+		// CT/T scores are derived from the (possibly edited) round list so
+		// game_stats stays consistent with rounds.
+		ct, t := 0, 0
+		for _, e := range edits {
+			if e.deleted {
+				continue
+			}
+			switch e.winner {
+			case database.TeamCT:
+				ct++
+			case database.TeamT:
+				t++
+			}
+		}
+
 		if err := database.UpdateGame(ctx, h.db, game.ID, ct, t, max, team); err != nil {
 			dialog.ShowError(err, h.window)
 			return
+		}
+		for _, e := range edits {
+			switch {
+			case e.id == 0 && !e.deleted:
+				if err := database.InsertRoundForGame(ctx, h.db, game.ID, e.winner, team); err != nil {
+					dialog.ShowError(err, h.window)
+					return
+				}
+			case e.id != 0 && e.deleted:
+				if err := database.DeleteRound(ctx, h.db, e.id); err != nil {
+					dialog.ShowError(err, h.window)
+					return
+				}
+			case e.id != 0 && e.dirty:
+				if err := database.UpdateRoundWinner(ctx, h.db, e.id, e.winner); err != nil {
+					dialog.ShowError(err, h.window)
+					return
+				}
+			}
 		}
 		h.refresh()
 		if h.onUpdate != nil {
 			h.onUpdate()
 		}
 	}, h.window)
+	d.Resize(fyne.NewSize(460, 0))
+	d.Show()
 }
 
 func (h *HistoryTab) confirmDelete(game *database.GameStats) {

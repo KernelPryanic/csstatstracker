@@ -214,6 +214,7 @@ func (t *Tracker) IncrementCT() {
 		return
 	}
 	t.ctWins++
+	t.recordRound(database.TeamCT)
 	t.updateLabels()
 	t.sound.PlayCTIncrement()
 	t.checkAutoSave()
@@ -223,6 +224,7 @@ func (t *Tracker) IncrementCT() {
 func (t *Tracker) DecrementCT() {
 	if t.ctWins > 0 {
 		t.ctWins--
+		t.undoLastRound(database.TeamCT)
 		t.updateLabels()
 		t.sound.PlayCTDecrement()
 	}
@@ -238,6 +240,7 @@ func (t *Tracker) IncrementT() {
 		return
 	}
 	t.tWins++
+	t.recordRound(database.TeamT)
 	t.updateLabels()
 	t.sound.PlayTIncrement()
 	t.checkAutoSave()
@@ -247,8 +250,21 @@ func (t *Tracker) IncrementT() {
 func (t *Tracker) DecrementT() {
 	if t.tWins > 0 {
 		t.tWins--
+		t.undoLastRound(database.TeamT)
 		t.updateLabels()
 		t.sound.PlayTDecrement()
+	}
+}
+
+func (t *Tracker) recordRound(winner database.Team) {
+	if _, err := database.InsertPendingRound(context.Background(), t.db, winner, t.team); err != nil {
+		fyne.LogError("failed to record round", err)
+	}
+}
+
+func (t *Tracker) undoLastRound(winner database.Team) {
+	if _, err := database.DeleteLastPendingRoundForWinner(context.Background(), t.db, winner); err != nil {
+		fyne.LogError("failed to undo round", err)
 	}
 }
 
@@ -264,10 +280,13 @@ func (t *Tracker) checkAutoSave() {
 	}
 }
 
-// Reset clears both scores
+// Reset clears both scores and discards any pending (unsaved) round log.
 func (t *Tracker) Reset() {
 	t.ctWins = 0
 	t.tWins = 0
+	if err := database.DeleteAllPendingRounds(context.Background(), t.db); err != nil {
+		fyne.LogError("failed to clear pending rounds", err)
+	}
 	t.updateLabels()
 	t.sound.PlayReset()
 }
@@ -291,10 +310,13 @@ func (t *Tracker) HandleDone() {
 		return
 	}
 
-	err = database.SaveGame(ctx, t.db, t.ctWins, t.tWins, gameScore, t.team)
+	gameID, err := database.SaveGame(ctx, t.db, t.ctWins, t.tWins, gameScore, t.team)
 	if err != nil {
 		dialog.ShowError(err, t.window)
 		return
+	}
+	if err := database.AssignPendingRoundsToGame(ctx, t.db, gameID); err != nil {
+		fyne.LogError("failed to attach rounds to game", err)
 	}
 
 	t.playMatchEndSound()

@@ -29,6 +29,7 @@ type Config struct {
 	Hotkeys        Hotkeys `json:"hotkeys"`
 	StatsPeriod    string  `json:"stats_period"`
 	StatsGroup     string  `json:"stats_group"`
+	StatsScope     string  `json:"stats_scope"`
 }
 
 // Default returns the default configuration
@@ -42,6 +43,7 @@ func Default() *Config {
 		Hotkeys:        defaultHotkeys(),
 		StatsPeriod:    "All Time",
 		StatsGroup:     "By Day",
+		StatsScope:     "Games",
 	}
 }
 
@@ -98,6 +100,9 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.StatsGroup == "" {
 		cfg.StatsGroup = "By Day"
+	}
+	if cfg.StatsScope == "" {
+		cfg.StatsScope = "Games"
 	}
 
 	return &cfg, nil
