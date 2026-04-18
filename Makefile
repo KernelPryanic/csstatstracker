@@ -42,7 +42,7 @@ ifdef IS_WIN
   endif
 endif
 
-.PHONY: all build build-dev run test lint fmt tidy vet clean help
+.PHONY: all build build-dev run test lint fmt tidy vet vuln clean help
 
 all: build
 
@@ -102,6 +102,10 @@ test:
 lint:
 	CGO_ENABLED=$(CGO_ENABLED) $(GO) run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest run --timeout 2m ./...
 
+# Run govulncheck over the entire project. Matches the CI static-checks job.
+vuln:
+	CGO_ENABLED=$(CGO_ENABLED) $(GO) run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
 fmt:
 	gofmt -s -w .
 
@@ -133,6 +137,7 @@ help:
 	@echo "    test       Run unit tests"
 	@echo "    lint       Run golangci-lint"
 	@echo "    vet        Run go vet"
+	@echo "    vuln       Run govulncheck (reachable vulnerability scan)"
 	@echo "    fmt        Format Go source with gofmt -s"
 	@echo "    tidy       Tidy go.mod"
 	@echo "    clean      Remove $(BIN_DIR)/"
