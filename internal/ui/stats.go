@@ -25,14 +25,6 @@ const (
 	AggregateByYear
 )
 
-// StatsScope selects whether the Win Rate sub-tab counts games or rounds.
-type StatsScope int
-
-const (
-	ScopeGames StatsScope = iota
-	ScopeRounds
-)
-
 // StatsTab manages the statistics view
 type StatsTab struct {
 	db            *sql.DB
@@ -41,7 +33,6 @@ type StatsTab struct {
 	onSave        func()
 	currentWindow database.TimeWindow
 	aggregation   AggregationInterval
-	scope         StatsScope
 	container     *fyne.Container
 
 	// Sub-tabs
@@ -51,7 +42,7 @@ type StatsTab struct {
 	winRateLabel   *widget.Label
 	ctWinRateLabel *widget.Label
 	tWinRateLabel  *widget.Label
-	gamesLabel     *widget.Label
+	countLabel     *widget.Label
 	chartLabel     *widget.Label
 	chartContainer *fyne.Container
 
@@ -63,6 +54,10 @@ type StatsTab struct {
 	timeChartContainer *fyne.Container
 }
 
+// secondsPerRound is our rough estimate for play-time calculations.
+// 1 minute 45 seconds per round.
+const secondsPerRound = 105
+
 // NewStatsTab creates a new statistics tab
 func NewStatsTab(db *sql.DB, window fyne.Window, cfg *config.Config, onSave func()) *StatsTab {
 	s := &StatsTab{
@@ -72,20 +67,10 @@ func NewStatsTab(db *sql.DB, window fyne.Window, cfg *config.Config, onSave func
 		onSave: onSave,
 	}
 
-	// Initialize from config
 	s.currentWindow = s.periodToWindow(cfg.StatsPeriod)
 	s.aggregation = s.groupToAggregation(cfg.StatsGroup)
-	s.scope = s.scopeFromString(cfg.StatsScope)
 
 	return s
-}
-
-// scopeFromString converts a config string to StatsScope.
-func (s *StatsTab) scopeFromString(v string) StatsScope {
-	if v == "Rounds" {
-		return ScopeRounds
-	}
-	return ScopeGames
 }
 
 // periodToWindow converts a period string to TimeWindow
@@ -124,7 +109,7 @@ func (s *StatsTab) Container() fyne.CanvasObject {
 	s.winRateLabel = widget.NewLabel("Win Rate: --")
 	s.ctWinRateLabel = widget.NewLabel("CT Win Rate: --")
 	s.tWinRateLabel = widget.NewLabel("T Win Rate: --")
-	s.gamesLabel = widget.NewLabel("Games: 0")
+	s.countLabel = widget.NewLabel("Rounds: 0")
 	s.chartLabel = widget.NewLabel("Net Wins/Losses by Day:")
 	s.chartContainer = container.NewStack()
 
@@ -172,29 +157,11 @@ func (s *StatsTab) Container() fyne.CanvasObject {
 		aggregationSelect,
 	)
 
-	// Scope selector lives on the Win Rate sub-tab only (Play Time is always
-	// game-based).
-	scopeSelect := widget.NewSelect([]string{"Games", "Rounds"}, func(selected string) {
-		s.scope = s.scopeFromString(selected)
-		s.cfg.StatsScope = selected
-		if s.onSave != nil {
-			s.onSave()
-		}
-		s.refresh()
-	})
-	scopeSelect.SetSelected(s.cfg.StatsScope)
-
-	scopePanel := container.NewHBox(
-		widget.NewLabel("Scope:"),
-		scopeSelect,
-	)
-
 	// Win Rate sub-tab content
 	winRateContent := container.NewBorder(
 		container.NewVBox(
-			scopePanel,
 			widget.NewSeparator(),
-			s.gamesLabel,
+			s.countLabel,
 			s.winRateLabel,
 			widget.NewSeparator(),
 			widget.NewLabel("Win Rate by Team:"),
@@ -262,73 +229,44 @@ func (s *StatsTab) Refresh() {
 func (s *StatsTab) refresh() {
 	ctx := context.Background()
 
-	// Win Rate sub-tab uses scope-selected stats. TotalGames on the struct
-	// actually holds round counts when scope is Rounds — see
-	// accumulateRoundOutcome.
-	var (
-		winRateStats *database.Stats
-		winRateDaily []database.DailyStats
-		err          error
-	)
-	if s.scope == ScopeRounds {
-		winRateStats, err = database.GetRoundStats(ctx, s.db, s.currentWindow)
-		if err == nil {
-			winRateDaily, err = database.GetDailyRoundStats(ctx, s.db, s.currentWindow)
-		}
-	} else {
-		winRateStats, err = database.GetStats(ctx, s.db, s.currentWindow)
-		if err == nil {
-			winRateDaily, err = database.GetDailyStats(ctx, s.db, s.currentWindow)
-		}
-	}
+	stats, err := database.GetStats(ctx, s.db, s.currentWindow)
 	if err != nil {
 		s.winRateLabel.SetText("Error loading stats")
 		s.totalTimeLabel.SetText("Error loading stats")
 		return
 	}
-
-	unit := "games"
-	countLabel := "Games"
-	if s.scope == ScopeRounds {
-		unit = "rounds"
-		countLabel = "Rounds"
+	daily, err := database.GetDailyStats(ctx, s.db, s.currentWindow)
+	if err != nil {
+		s.winRateLabel.SetText("Error loading stats")
+		return
 	}
 
-	s.gamesLabel.SetText(fmt.Sprintf("%s: %d (W:%d L:%d D:%d)", countLabel, winRateStats.TotalGames, winRateStats.Wins, winRateStats.Losses, winRateStats.Draws))
-	s.winRateLabel.SetText(fmt.Sprintf("Win Rate: %.1f%%", winRateStats.WinRate))
-	s.ctWinRateLabel.SetText(fmt.Sprintf("CT: %.1f%% (%d/%d %s)", winRateStats.CTWinRate, winRateStats.CTWins, winRateStats.CTGames, unit))
-	s.tWinRateLabel.SetText(fmt.Sprintf("T: %.1f%% (%d/%d %s)", winRateStats.TWinRate, winRateStats.TWins, winRateStats.TGames, unit))
+	// Win Rate labels — everything is round-scoped now.
+	s.countLabel.SetText(fmt.Sprintf("Rounds: %d (W:%d L:%d D:%d)",
+		stats.TotalRounds, stats.Wins, stats.Losses, stats.Draws))
+	s.winRateLabel.SetText(fmt.Sprintf("Win Rate: %.1f%%", stats.WinRate))
+	s.ctWinRateLabel.SetText(fmt.Sprintf("CT: %.1f%% (%d/%d rounds)",
+		stats.CTWinRate, stats.CTWins, stats.CTRounds))
+	s.tWinRateLabel.SetText(fmt.Sprintf("T: %.1f%% (%d/%d rounds)",
+		stats.TWinRate, stats.TWins, stats.TRounds))
 
-	// Play Time is always game-scoped regardless of selected scope.
-	gameStats := winRateStats
-	if s.scope == ScopeRounds {
-		gameStats, err = database.GetStats(ctx, s.db, s.currentWindow)
-		if err != nil {
-			s.totalTimeLabel.SetText("Error loading stats")
-			return
-		}
-	}
-	const minutesPerGame = 27
-	totalMinutes := gameStats.TotalGames * minutesPerGame
-	ctMinutes := gameStats.CTGames * minutesPerGame
-	tMinutes := gameStats.TGames * minutesPerGame
-	s.totalTimeLabel.SetText(fmt.Sprintf("Total Play Time: %s (%d games)", formatPlayTime(totalMinutes), gameStats.TotalGames))
-	s.ctTimeLabel.SetText(fmt.Sprintf("CT: %s (%d games)", formatPlayTime(ctMinutes), gameStats.CTGames))
-	s.tTimeLabel.SetText(fmt.Sprintf("T: %s (%d games)", formatPlayTime(tMinutes), gameStats.TGames))
+	// Play Time: estimated at secondsPerRound per round.
+	totalMinutes := stats.TotalRounds * secondsPerRound / 60
+	ctMinutes := stats.CTRounds * secondsPerRound / 60
+	tMinutes := stats.TRounds * secondsPerRound / 60
+	s.totalTimeLabel.SetText(fmt.Sprintf("Total Play Time: %s (%d rounds)",
+		formatPlayTime(totalMinutes), stats.TotalRounds))
+	s.ctTimeLabel.SetText(fmt.Sprintf("CT: %s (%d rounds)",
+		formatPlayTime(ctMinutes), stats.CTRounds))
+	s.tTimeLabel.SetText(fmt.Sprintf("T: %s (%d rounds)",
+		formatPlayTime(tMinutes), stats.TRounds))
 
-	// Build Win Rate chart from the scope-selected daily stats.
-	aggregatedWinRate := s.aggregateStats(winRateDaily)
-	chart := s.buildChart(aggregatedWinRate)
+	aggregated := s.aggregateStats(daily)
+	chart := s.buildChart(aggregated)
 	s.chartContainer.Objects = []fyne.CanvasObject{chart}
 	s.chartContainer.Refresh()
 
-	// Play Time chart always uses game-level daily stats.
-	playTimeDaily, err := database.GetDailyStats(ctx, s.db, s.currentWindow)
-	if err != nil {
-		return
-	}
-	aggregatedPlayTime := s.aggregateStats(playTimeDaily)
-	timeChart := s.buildTimeChart(aggregatedPlayTime)
+	timeChart := s.buildTimeChart(aggregated)
 	s.timeChartContainer.Objects = []fyne.CanvasObject{timeChart}
 	s.timeChartContainer.Refresh()
 }
@@ -525,14 +463,13 @@ func (s *StatsTab) buildTimeChart(stats []AggregatedStats) fyne.CanvasObject {
 		return container.NewCenter(noDataLabel)
 	}
 
-	const minutesPerGame = 27
-
-	// Calculate time values in minutes and find max value for scaling
+	// Play time per bucket is derived from the number of rounds played that
+	// day (wins + losses — draws are rounds with no team).
 	timeValues := make([]int, len(stats))
 	maxTime := 1
 	for i, st := range stats {
-		totalGames := st.Wins + st.Losses
-		timeValues[i] = totalGames * minutesPerGame
+		totalRounds := st.Wins + st.Losses
+		timeValues[i] = totalRounds * secondsPerRound / 60
 		if timeValues[i] > maxTime {
 			maxTime = timeValues[i]
 		}

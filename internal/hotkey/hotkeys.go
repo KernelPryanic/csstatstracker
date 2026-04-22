@@ -19,7 +19,6 @@ const (
 	ActionDecrementCT
 	ActionIncrementT
 	ActionDecrementT
-	ActionReset
 	ActionSelectCT
 	ActionSelectT
 	ActionSwapTeams
@@ -31,7 +30,6 @@ type Bindings struct {
 	DecrementCT []string
 	IncrementT  []string
 	DecrementT  []string
-	Reset       []string
 	SelectCT    []string
 	SelectT     []string
 	SwapTeams   []string
@@ -129,8 +127,6 @@ func (h *Handler) handleKeyDown(keyName string) {
 		action = ActionIncrementT
 	} else if h.matchesCombo(h.bindings.DecrementT) {
 		action = ActionDecrementT
-	} else if h.matchesCombo(h.bindings.Reset) {
-		action = ActionReset
 	} else if h.matchesCombo(h.bindings.SelectCT) {
 		action = ActionSelectCT
 	} else if h.matchesCombo(h.bindings.SelectT) {

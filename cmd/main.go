@@ -3,10 +3,12 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"image/color"
+	"log"
 	"os"
 
 	"fyne.io/fyne/v2"
@@ -28,11 +30,31 @@ import (
 // singleInstancePort is a fixed loopback port used as a cross-platform mutex.
 const singleInstancePort = 53017
 
+// logFilter wraps an io.Writer and drops lines matching the systray "not ready"
+// warning that Fyne prints during startup — the icon gets set correctly once
+// the backend is ready, so the warning is pure noise.
+type logFilter struct {
+	inner interface{ Write([]byte) (int, error) }
+}
+
+func (f *logFilter) Write(p []byte) (int, error) {
+	if bytes.Contains(p, []byte("systray error: unable to set icon: tray not ready yet")) {
+		return len(p), nil
+	}
+	return f.inner.Write(p)
+}
+
+func init() {
+	log.SetOutput(&logFilter{inner: os.Stderr})
+}
+
 func main() {
 	lock, err := singleinstance.Acquire(singleInstancePort)
 	if err != nil {
 		if errors.Is(err, singleinstance.ErrAlreadyRunning) {
-			fmt.Fprintln(os.Stderr, "CS Stats Tracker is already running.")
+			// Show a GUI dialog because the binary uses -H=windowsgui and has
+			// no console — a silent exit would leave the user wondering why.
+			notifyAlreadyRunning()
 			os.Exit(1)
 		}
 		panic(fmt.Errorf("failed to acquire single-instance lock: %w", err))
@@ -151,31 +173,21 @@ func main() {
 		}
 	})
 
-	// Create game score input
-	gameScoreLabel := widget.NewLabel("Game:")
-	gameScoreContainer := container.NewHBox(
+	// Team selector row.
+	teamRow := container.NewHBox(
 		layout.NewSpacer(),
-		gameScoreLabel,
-		t.MaxEntry(),
 		widget.NewLabel("Team:"),
 		teamSelect,
 		layout.NewSpacer(),
 	)
 
-	// Create action buttons
+	// Action buttons row.
 	swapButton := widget.NewButton("Swap Teams", func() {
 		t.SwapTeams()
 	})
-
-	resetButton := widget.NewButton("Reset", func() {
-		t.Reset()
-	})
-	resetButton.Importance = widget.DangerImportance
-
 	actionButtonsContainer := container.NewHBox(
 		layout.NewSpacer(),
 		swapButton,
-		resetButton,
 		layout.NewSpacer(),
 	)
 
@@ -183,7 +195,7 @@ func main() {
 	trackerContent := container.NewBorder(
 		nil,
 		container.NewVBox(
-			gameScoreContainer,
+			teamRow,
 			actionButtonsContainer,
 		),
 		nil,
@@ -234,21 +246,18 @@ func main() {
 	w.SetContent(tabs)
 	w.Resize(fyne.Size{Width: 600, Height: 450})
 
-	// Setup system tray
+	// Setup system tray. Also set the icon as the app's main icon so the
+	// systray has a fallback if the first SetSystemTrayIcon call races with
+	// the systray backend starting up.
+	trayIcon := fyne.NewStaticResource("icon.png", csstatstracker.IconData)
+	a.SetIcon(trayIcon)
 	if desk, ok := a.(desktop.App); ok {
-		// Create tray icon from embedded resource
-		trayIcon := fyne.NewStaticResource("icon.png", csstatstracker.IconData)
 		desk.SetSystemTrayIcon(trayIcon)
 
-		// Create tray menu
 		trayMenu := fyne.NewMenu("CS Stats Tracker",
-			fyne.NewMenuItem("Show", func() {
-				w.Show()
-			}),
+			fyne.NewMenuItem("Show", func() { w.Show() }),
 			fyne.NewMenuItemSeparator(),
-			fyne.NewMenuItem("Quit", func() {
-				a.Quit()
-			}),
+			fyne.NewMenuItem("Quit", func() { a.Quit() }),
 		)
 		desk.SetSystemTrayMenu(trayMenu)
 	}

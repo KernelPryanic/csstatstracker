@@ -37,7 +37,12 @@ jobs:
           cat FyneApp.toml
 
       - name: Build Windows binary
-        run: fyne-cross windows -arch=amd64 --release --app-id com.csstatstracker.app ./cmd/
+        # fyne-cross refuses --release when cross-compiling from Linux.
+        # Debug symbols are stripped by default; we add -H=windowsgui so the
+        # .exe doesn't spawn a console window. --env GOTOOLCHAIN=auto lets Go
+        # download the toolchain declared in go.mod when the Docker image
+        # ships an older one.
+        run: fyne-cross windows -arch=amd64 --app-id com.csstatstracker.app --ldflags "-H=windowsgui" --env GOTOOLCHAIN=auto ./cmd/
 
       - name: Prepare Windows artifact
         run: |

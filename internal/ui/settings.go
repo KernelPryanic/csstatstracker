@@ -65,7 +65,7 @@ func (s *SettingsTab) buildUI() fyne.CanvasObject {
 	trayCheck.Checked = s.cfg.MinimizeToTray
 
 	// Create buttons for each hotkey
-	var incCTButton, decCTButton, incTButton, decTButton, resetHotkeyButton, selectCTButton, selectTButton, swapTeamsButton *widget.Button
+	var incCTButton, decCTButton, incTButton, decTButton, selectCTButton, selectTButton, swapTeamsButton *widget.Button
 
 	incCTButton = widget.NewButton(FormatHotkeys(s.cfg.Hotkeys.IncrementCT), func() {
 		CaptureHotkey(s.window, "Increment CT", &s.cfg.Hotkeys.IncrementCT, incCTButton, s.save)
@@ -81,10 +81,6 @@ func (s *SettingsTab) buildUI() fyne.CanvasObject {
 
 	decTButton = widget.NewButton(FormatHotkeys(s.cfg.Hotkeys.DecrementT), func() {
 		CaptureHotkey(s.window, "Decrement T", &s.cfg.Hotkeys.DecrementT, decTButton, s.save)
-	})
-
-	resetHotkeyButton = widget.NewButton(FormatHotkeys(s.cfg.Hotkeys.Reset), func() {
-		CaptureHotkey(s.window, "Reset", &s.cfg.Hotkeys.Reset, resetHotkeyButton, s.save)
 	})
 
 	selectCTButton = widget.NewButton(FormatHotkeys(s.cfg.Hotkeys.SelectCT), func() {
@@ -110,7 +106,6 @@ func (s *SettingsTab) buildUI() fyne.CanvasObject {
 			widget.NewFormItem("Decrement CT", decCTButton),
 			widget.NewFormItem("Increment T", incTButton),
 			widget.NewFormItem("Decrement T", decTButton),
-			widget.NewFormItem("Reset", resetHotkeyButton),
 			widget.NewFormItem("Select CT Team", selectCTButton),
 			widget.NewFormItem("Select T Team", selectTButton),
 			widget.NewFormItem("Swap Teams", swapTeamsButton),

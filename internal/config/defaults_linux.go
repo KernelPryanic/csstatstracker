@@ -9,7 +9,6 @@ func defaultHotkeys() Hotkeys {
 		DecrementCT: []string{"Numpad1", "NumpadSubtract"},
 		IncrementT:  []string{"Numpad2", "NumpadAdd"},
 		DecrementT:  []string{"Numpad2", "NumpadSubtract"},
-		Reset:       []string{"Numpad0", "NumpadEnter"},
 		SelectCT:    []string{"LeftControl", "LeftShift", "c"},
 		SelectT:     []string{"LeftControl", "LeftShift", "t"},
 		SwapTeams:   []string{"NumpadDecimal", "NumpadEnter"},

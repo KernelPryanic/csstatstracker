@@ -14,7 +14,6 @@ type Hotkeys struct {
 	DecrementCT []string `json:"decrement_ct"`
 	IncrementT  []string `json:"increment_t"`
 	DecrementT  []string `json:"decrement_t"`
-	Reset       []string `json:"reset"`
 	SelectCT    []string `json:"select_ct"`
 	SelectT     []string `json:"select_t"`
 	SwapTeams   []string `json:"swap_teams"`
@@ -22,28 +21,24 @@ type Hotkeys struct {
 
 // Config holds the application configuration
 type Config struct {
-	GameScore      int     `json:"game_score"`
 	SoundEnabled   bool    `json:"sound_enabled"`
 	SoundVolume    float64 `json:"sound_volume"`
 	MinimizeToTray bool    `json:"minimize_to_tray"`
 	Hotkeys        Hotkeys `json:"hotkeys"`
 	StatsPeriod    string  `json:"stats_period"`
 	StatsGroup     string  `json:"stats_group"`
-	StatsScope     string  `json:"stats_scope"`
 }
 
 // Default returns the default configuration
 // Hotkey defaults are platform-specific (see defaults_linux.go, defaults_windows.go)
 func Default() *Config {
 	return &Config{
-		GameScore:      8,
 		SoundEnabled:   true,
 		SoundVolume:    1.0,
 		MinimizeToTray: false,
 		Hotkeys:        defaultHotkeys(),
 		StatsPeriod:    "All Time",
 		StatsGroup:     "By Day",
-		StatsScope:     "Games",
 	}
 }
 
@@ -76,9 +71,6 @@ func Load(path string) (*Config, error) {
 	if len(cfg.Hotkeys.DecrementT) == 0 {
 		cfg.Hotkeys.DecrementT = def.Hotkeys.DecrementT
 	}
-	if len(cfg.Hotkeys.Reset) == 0 {
-		cfg.Hotkeys.Reset = def.Hotkeys.Reset
-	}
 	if len(cfg.Hotkeys.SelectCT) == 0 {
 		cfg.Hotkeys.SelectCT = def.Hotkeys.SelectCT
 	}
@@ -100,9 +92,6 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.StatsGroup == "" {
 		cfg.StatsGroup = "By Day"
-	}
-	if cfg.StatsScope == "" {
-		cfg.StatsScope = "Games"
 	}
 
 	return &cfg, nil
